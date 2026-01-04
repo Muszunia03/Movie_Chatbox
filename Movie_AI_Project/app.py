@@ -9,9 +9,9 @@ import plotly.express as px
 import time
 
 # --- KONFIGURACJA ---
-GROQ_API_KEY = "groq_klucz"
+GROQ_API_KEY = "key-your-groq-api-key"
 
-st.set_page_config(page_title="🎥 CineMate AI Pro", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="CineMate AI Pro", page_icon="🧠", layout="wide")
 
 # --- CSS (Stylizacja) ---
 st.markdown("""
@@ -81,7 +81,7 @@ def add_to_watchlist(movie):
             'overview': movie['overview'],
             'genres': movie['genres_clean']
         })
-        st.toast(f"✅ Dodano: {movie['title']}", icon="💾")
+        st.toast(f"Dodano: {movie['title']}", icon="💾")
     else:
         st.toast("Już masz ten film na liście!", icon="ℹ️")
 
@@ -109,7 +109,7 @@ def load_data():
 
         # Embeddingi
         embed_model = SentenceTransformer('all-MiniLM-L6-v2')
-        with st.spinner("🚀 Inicjalizacja systemu AI..."):
+        with st.spinner("Inicjalizacja systemu AI..."):
             vectors = embed_model.encode(df['combined_info'].tolist(), show_progress_bar=True)
 
         vectors = np.array(vectors).astype('float32')
@@ -131,7 +131,7 @@ index, df, embed_model, all_genres = load_data()
 client = Groq(api_key=GROQ_API_KEY)
 
 # --- UKŁAD STRONY ---
-tab1, tab2, tab3 = st.tabs(["🎬 Czat AI", "📊 Analityka", "❤️ Moja Lista"])
+tab1, tab2, tab3 = st.tabs(["Czat AI", "Analityka", "Moja Lista"])
 
 # === ZAKŁADKA 1: CZAT ===
 with tab1:
@@ -145,10 +145,10 @@ with tab1:
         creativity = st.slider("Kreatywność", 0.0, 1.0, 0.6)
 
         st.divider()
-        st.info("💡 Wyniki są zapamiętywane, więc możesz klikać 'Dodaj' bez znikania listy.")
+        st.info("Wyniki są zapamiętywane, więc możesz klikać 'Dodaj' bez znikania listy.")
 
     with col_chat:
-        st.title("🍿 CineMate AI")
+        st.title("CineMate AI")
 
         # 1. KONTENER NA TREŚĆ (Tutaj ląduje historia i wyniki)
         chat_container = st.container()
@@ -207,7 +207,7 @@ with tab1:
             # B. Wyniki wyszukiwania (Zawsze renderujemy to co jest w pamięci)
             if st.session_state.last_results:
                 st.divider()
-                st.caption("🎬 Znalezione filmy (Kliknij +, aby dodać):")
+                st.caption("Znalezione filmy (Kliknij +, aby dodać):")
 
                 cols = st.columns(4)
                 for i, (movie, score) in enumerate(st.session_state.last_results):
@@ -215,19 +215,19 @@ with tab1:
                         with st.container():
                             # Karta filmu (Bez obrazka)
                             st.markdown(f"**{movie['title']}**")
-                            st.caption(f"📅 {movie['year']} | ⭐ {movie['vote_average']}")
+                            st.caption(f"{movie['year']} | {movie['vote_average']}")
                             st.markdown(f"<span class='match-score'>{int(score)}% Match</span>", unsafe_allow_html=True)
 
                             # PRZYCISK - TERAZ DZIAŁA BO DANE SĄ W SESJI
                             # Klucz musi być unikalny dla filmu
                             btn_key = f"btn_{movie['title'].replace(' ', '_')}_{i}"
-                            if st.button("➕ Dodaj", key=btn_key):
+                            if st.button("Dodaj", key=btn_key):
                                 add_to_watchlist(movie)
                             st.divider()
 
 # === ZAKŁADKA 2: ANALITYKA (BOGATSZA WERSJA) ===
 with tab2:
-    st.title("📊 Laboratorium Danych")
+    st.title("Laboratorium Danych")
     st.markdown("Analiza zbioru danych wykorzystywanego przez model.")
 
     # 1. Duże Liczby (KPI)
@@ -243,7 +243,7 @@ with tab2:
     col_chart1, col_chart2 = st.columns(2)
 
     with col_chart1:
-        st.subheader("📈 Jak oceniane są filmy?")
+        st.subheader("Jak oceniane są filmy?")
         # Histogram
         fig_hist = px.histogram(df, x="vote_average", nbins=20, title="Rozkład Ocen (IMDB)",
                                 color_discrete_sequence=['#ffbd45'])
@@ -251,7 +251,7 @@ with tab2:
         st.plotly_chart(fig_hist, use_container_width=True)
 
     with col_chart2:
-        st.subheader("🎭 Najpopularniejsze Gatunki")
+        st.subheader("Najpopularniejsze Gatunki")
         # Przetwarzanie gatunków do wykresu (rozdzielamy po przecinku)
         all_genres_list = [g for sublist in df['genres_clean'].str.split(', ') for g in sublist if g]
         genre_counts = pd.Series(all_genres_list).value_counts().head(10)
@@ -266,7 +266,7 @@ with tab2:
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # 3. Wykres liniowy (Area Chart) - Trendy
-    st.subheader("🗓️ Historia Kina: Liczba filmów w czasie")
+    st.subheader("🗓Historia Kina: Liczba filmów w czasie")
     year_counts = df['year'].value_counts().sort_index()
     year_counts = year_counts[year_counts.index > 1920]  # Omijamy bardzo stare błędy danych
 
@@ -277,11 +277,11 @@ with tab2:
     st.plotly_chart(fig_area, use_container_width=True)
 
     st.info(
-        "💡 **Wniosek:** Baza danych wykazuje eksponencjalny wzrost liczby filmów po roku 1990, co może wpływać na to, że model częściej poleca nowsze produkcje.")
+        "**Wniosek:** Baza danych wykazuje eksponencjalny wzrost liczby filmów po roku 1990, co może wpływać na to, że model częściej poleca nowsze produkcje.")
 
 # === ZAKŁADKA 3: WATCHLISTA ===
 with tab3:
-    st.header(f"❤️ Moja Lista ({len(st.session_state.watchlist)})")
+    st.header(f"Moja Lista ({len(st.session_state.watchlist)})")
 
     if not st.session_state.watchlist:
         st.info("Lista jest pusta. Wróć do czatu i dodaj coś!")
@@ -294,7 +294,7 @@ with tab3:
         titles = [m['title'] for m in st.session_state.watchlist]
         movie_to_delete = st.selectbox("Wybierz film do usunięcia", titles)
 
-        if st.button("🗑️ Usuń wybrany"):
+        if st.button("🗑Usuń wybrany"):
             st.session_state.watchlist = [m for m in st.session_state.watchlist if m['title'] != movie_to_delete]
             st.rerun()
 
@@ -302,7 +302,7 @@ with tab3:
         st.divider()
         csv = wl_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Pobierz listę (CSV)",
+            label="Pobierz listę (CSV)",
             data=csv,
             file_name='moja_lista.csv',
             mime='text/csv'

@@ -9,7 +9,7 @@ import plotly.express as px
 import time
 
 # --- KONFIGURACJA ---
-GROQ_API_KEY = "key-your-groq-api-key"
+GROQ_API_KEY = ""
 
 st.set_page_config(page_title="CineMate AI Pro", page_icon="🧠", layout="wide")
 
@@ -19,7 +19,7 @@ st.markdown("""
     /* Karta filmu */
     .movie-card { 
         background-color: #1E1E1E; 
-        padding: 15px; 
+        padding: 15px;
         border-radius: 8px; 
         margin-bottom: 10px; 
         border-left: 5px solid #FF4B4B;
@@ -49,7 +49,6 @@ if "watchlist" not in st.session_state:
     st.session_state.watchlist = []
 if "messages" not in st.session_state:
     st.session_state.messages = []
-# KLUCZOWA POPRAWKA: Pamięć ostatnich wyników, żeby nie znikały po kliknięciu przycisku
 if "last_results" not in st.session_state:
     st.session_state.last_results = []
 
@@ -73,7 +72,6 @@ def get_year(date_str):
 
 
 def add_to_watchlist(movie):
-    # Sprawdzamy duplikaty po tytule
     if not any(m['title'] == movie['title'] for m in st.session_state.watchlist):
         st.session_state.watchlist.append({
             'title': movie['title'],
@@ -92,7 +90,6 @@ def load_data():
     try:
         df = pd.read_csv("tmdb_5000_movies.csv")
 
-        # Czyszczenie
         df['genres_clean'] = df['genres'].apply(parse_json_column)
         df['keywords_clean'] = df['keywords'].apply(parse_json_column)
         df['overview'] = df['overview'].fillna('')
@@ -100,14 +97,12 @@ def load_data():
         df['year'] = df['release_date'].apply(get_year)
         df['vote_average'] = df['vote_average'].fillna(0)
 
-        # Tekst do AI
         df['combined_info'] = (
                 "Title: " + df['title'] +
                 " | Genres: " + df['genres_clean'] +
                 " | Plot: " + df['overview']
         )
 
-        # Embeddingi
         embed_model = SentenceTransformer('all-MiniLM-L6-v2')
         with st.spinner("Inicjalizacja systemu AI..."):
             vectors = embed_model.encode(df['combined_info'].tolist(), show_progress_bar=True)
@@ -139,7 +134,6 @@ with tab1:
 
     with col_filters:
         st.subheader("Filtry")
-        # USUNIĘTE ZDJĘCIA - TYLKO TEKST
         selected_genre = st.selectbox("Gatunek", ["Wszystkie"] + all_genres)
         min_rating = st.slider("Min. Ocena", 0.0, 10.0, 6.0)
         creativity = st.slider("Kreatywność", 0.0, 1.0, 0.6)
@@ -150,23 +144,20 @@ with tab1:
     with col_chat:
         st.title("CineMate AI")
 
-        # 1. KONTENER NA TREŚĆ (Tutaj ląduje historia i wyniki)
+        # 1. KONTENER NA TREŚĆ
         chat_container = st.container()
 
-        # 2. PASEK INPUTU (NA SAMYM DOLE)
+        # 2. PASEK INPUTU
         user_input = st.chat_input("Napisz, jaki film chcesz obejrzeć...")
 
         # --- LOGIKA 1: PRZETWARZANIE NOWEGO ZAPYTANIA ---
-        # Uruchamia się TYLKO gdy user wciśnie Enter
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
 
             if index is not None:
-                # Wektoryzacja
                 q_vec = embed_model.encode([user_input]).astype('float32')
                 D, I = index.search(q_vec, 100)
 
-                # Filtrowanie i ZAPIS DO PAMIĘCI
                 new_results = []
                 for dist, idx in zip(D[0], I[0]):
                     if idx == -1: continue
@@ -177,17 +168,17 @@ with tab1:
                     new_results.append((m, score))
                     if len(new_results) >= 4: break  # Top 4
 
-                # Zapisujemy wyniki w sesji! To klucz do naprawy przycisku.
                 st.session_state.last_results = new_results
 
-                # Generowanie odpowiedzi AI
                 context_text = "\n".join([f"{m['title']}: {m['overview']}" for m, s in new_results])
                 try:
                     final_resp = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[
                             {"role": "system",
-                             "content": f"Jesteś ekspertem. Krótko (2 zdania) poleć jeden najlepszy film z listy: {context_text}. Odpowiedz po polsku."},
+                             "content": f"Jesteś ekspertem filmowym. Krótko (2 zdania) poleć jeden, dwa lub trzy najlepsze film z listy: {context_text}. "
+                                        f"Odpowiadaj TYLKO i WYŁĄCZNIE na podstawie danych z listy: {context_text} w języku polskim."
+                                        f"Gdy nie znasz odpowiedzi zwróć: Brak danych w bibliotece filmów."},
                             {"role": "user", "content": user_input}
                         ],
                         temperature=creativity
@@ -199,12 +190,10 @@ with tab1:
 
         # --- LOGIKA 2: RENDEROWANIE EKRANU (Zawsze) ---
         with chat_container:
-            # A. Historia
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
 
-            # B. Wyniki wyszukiwania (Zawsze renderujemy to co jest w pamięci)
             if st.session_state.last_results:
                 st.divider()
                 st.caption("Znalezione filmy (Kliknij +, aby dodać):")
@@ -213,24 +202,20 @@ with tab1:
                 for i, (movie, score) in enumerate(st.session_state.last_results):
                     with cols[i]:
                         with st.container():
-                            # Karta filmu (Bez obrazka)
                             st.markdown(f"**{movie['title']}**")
                             st.caption(f"{movie['year']} | {movie['vote_average']}")
                             st.markdown(f"<span class='match-score'>{int(score)}% Match</span>", unsafe_allow_html=True)
 
-                            # PRZYCISK - TERAZ DZIAŁA BO DANE SĄ W SESJI
-                            # Klucz musi być unikalny dla filmu
                             btn_key = f"btn_{movie['title'].replace(' ', '_')}_{i}"
                             if st.button("Dodaj", key=btn_key):
                                 add_to_watchlist(movie)
                             st.divider()
 
-# === ZAKŁADKA 2: ANALITYKA (BOGATSZA WERSJA) ===
+# === ZAKŁADKA 2: ANALITYKA ===
 with tab2:
     st.title("Laboratorium Danych")
     st.markdown("Analiza zbioru danych wykorzystywanego przez model.")
 
-    # 1. Duże Liczby (KPI)
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Liczba Filmów", len(df))
     m2.metric("Średnia Ocena", round(df['vote_average'].mean(), 2))
@@ -239,12 +224,10 @@ with tab2:
 
     st.divider()
 
-    # 2. Wykresy w dwóch kolumnach
     col_chart1, col_chart2 = st.columns(2)
 
     with col_chart1:
         st.subheader("Jak oceniane są filmy?")
-        # Histogram
         fig_hist = px.histogram(df, x="vote_average", nbins=20, title="Rozkład Ocen (IMDB)",
                                 color_discrete_sequence=['#ffbd45'])
         fig_hist.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white")
@@ -252,23 +235,20 @@ with tab2:
 
     with col_chart2:
         st.subheader("Najpopularniejsze Gatunki")
-        # Przetwarzanie gatunków do wykresu (rozdzielamy po przecinku)
         all_genres_list = [g for sublist in df['genres_clean'].str.split(', ') for g in sublist if g]
         genre_counts = pd.Series(all_genres_list).value_counts().head(10)
 
-        # Wykres słupkowy poziomy
         fig_bar = px.bar(genre_counts, x=genre_counts.values, y=genre_counts.index, orientation='h',
                          title="Top 10 Gatunków",
                          color=genre_counts.values,
                          color_continuous_scale='Bluered')
         fig_bar.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white",
-                              yaxis=dict(autorange="reversed"))  # Odwracamy, żeby najpopularniejszy był na górze
+                              yaxis=dict(autorange="reversed"))
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    # 3. Wykres liniowy (Area Chart) - Trendy
     st.subheader("🗓Historia Kina: Liczba filmów w czasie")
     year_counts = df['year'].value_counts().sort_index()
-    year_counts = year_counts[year_counts.index > 1920]  # Omijamy bardzo stare błędy danych
+    year_counts = year_counts[year_counts.index > 1920]
 
     fig_area = px.area(x=year_counts.index, y=year_counts.values,
                        title="Wzrost produkcji filmowej",
@@ -289,7 +269,6 @@ with tab3:
         wl_df = pd.DataFrame(st.session_state.watchlist)
         st.dataframe(wl_df[['title', 'year', 'genres']], use_container_width=True)
 
-        # Usuwanie
         st.subheader("Zarządzanie")
         titles = [m['title'] for m in st.session_state.watchlist]
         movie_to_delete = st.selectbox("Wybierz film do usunięcia", titles)
@@ -298,7 +277,6 @@ with tab3:
             st.session_state.watchlist = [m for m in st.session_state.watchlist if m['title'] != movie_to_delete]
             st.rerun()
 
-        # Eksport (IDP)
         st.divider()
         csv = wl_df.to_csv(index=False).encode('utf-8')
         st.download_button(
